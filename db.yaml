@@ -1,0 +1,3 @@
+user: arc
+database: ges_idr5_wg11_abundances
+host: /var/run/postgresql/
