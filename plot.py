@@ -1208,7 +1208,8 @@ def compare_benchmarks(database, element, ion, benchmarks_filename, bins = 20, e
     return figures
 
 
-def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_by = None, extent = (-1, +1), **kwargs):
+def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_by = None, relative=False, 
+    show_errors=False, extent=None, sql_constraint=None, **kwargs):
     """
     Show the line abundances for the benchmark stars. Information for each
     benchmark star should be contained in the `benchmark_filename` provided.
@@ -1216,10 +1217,15 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
     """
     benchmarks = load_benchmarks(benchmark_filename)
     bm_abundance_repr = element
-    benchmarks = [ bm for bm in benchmarks if bm.abundances.get(bm_abundance_repr, False) ]
+    #benchmarks = [ bm for bm in benchmarks if bm.abundances.get(bm_abundance_repr, False) ]
     sort_by = sort_by or 'name'
     benchmarks = sorted(benchmarks, key=lambda bm: getattr(bm, sort_by))
-    measurements = data.retrieve_table(database, "SELECT * FROM line_abundances l JOIN\n        (SELECT cname, ges_fld, object FROM node_results WHERE GES_TYPE LIKE '%_BM') n\n        ON (l.element = '{0}' AND l.ion = '{1}' AND l.cname = n.cname)\n        ORDER BY wavelength ASC".format(element, ion))
+    sql_constraint = "" if sql_constraint is None else "AND ({})".format(sql_constraint)
+    measurements = data.retrieve_table(
+        database, 
+        "SELECT * FROM line_abundances l JOIN\n        (SELECT cname, ges_fld, object FROM node_results WHERE GES_TYPE LIKE '%_BM') n\n        ON (l.element = '{0}' AND l.ion = '{1}' AND l.cname = n.cname {2})\n        ORDER BY wavelength ASC".format(element, ion, sql_constraint))
+    if measurements is None:
+        return None
     decimals = kwargs.pop('__round_wavelengths', 1)
     if decimals >= 0:
         measurements['wavelength'] = np.round(measurements['wavelength'], decimals)
@@ -1236,9 +1242,11 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
     xdim = lb * escale + xs + tr * escale
     ydim = lb * escale + ys + tr * escale
     fig, axes = plt.subplots(Ny, Nx, figsize=(xdim, ydim))
+    axes = np.atleast_2d(axes)
     fig.subplots_adjust(left=lb * escale / xdim, right=(tr * escale + xs) / xdim, bottom=lb * escale / ydim, top=(tr * escale + ys) / ydim, wspace=xspace, hspace=yspace)
     scatter_kwds = {'s': 50,
      'zorder': 10}
+
     measurements = measurements.group_by(['wavelength'])
     for i, (ax_group, wavelength, group) in enumerate(zip(axes, wavelengths, measurements.groups)):
         nodes = sorted(set(group['node']))
@@ -1249,8 +1257,8 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
         for j, benchmark in enumerate(benchmarks):
             logger.debug('Matching on {}'.format(benchmark))
             name = benchmark.name.lower()
-            group['ges_fld'] = map(str.strip, map(str.lower, group['ges_fld']))
-            group['1.object'] = map(str.strip, map(str.lower, group['1.object']))
+            group['ges_fld'] = list(map(str.strip, list(map(str.lower, group['ges_fld']))))
+            group['1.object'] = list(map(str.strip, list(map(str.lower, group['1.object']))))
             match = np.array([ k for k, row in enumerate(group) if name == row['ges_fld'] or name == row['1.object'] ])
             logger.debug('Found {0} matches for {1}'.format(len(match), benchmark))
             if not any(match):
@@ -1259,7 +1267,9 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
             for node in nodes:
                 match_node = match[group['node'][match] == node]
                 x_data[node].extend(j * np.ones(len(match_node)))
-                difference = group['abundance'][match_node] - benchmark.abundances[bm_abundance_repr][0]
+                difference = group['abundance'][match_node]
+                if relative:
+                    difference = difference - benchmark.abundances.get(bm_abundance_repr, [np.nan])[0]
                 y_data[node].extend(difference)
                 y_err[node].extend(group['e_abundance'][match_node])
                 y_mean_offsets[node].append(np.nanmean(difference))
@@ -1267,9 +1277,13 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
         for k, (ax, node) in enumerate(zip(ax_group, all_nodes)):
             if ax.is_first_row():
                 ax.set_title(node)
-                if ax.is_first_col():
-                    ax.text(0.05, 0.95, '${0}$'.format(wavelength), transform=ax.transAxes, horizontalalignment='left', verticalalignment='top')
-            ax.axhline(0, c='k', zorder=0)
+
+            if ax.is_first_col():
+                ax.text(0.05, 0.95, '${0}$'.format(wavelength), transform=ax.transAxes, horizontalalignment='left', verticalalignment='top',
+                    zorder=100)
+
+            if relative:
+                ax.axhline(0, c='k', zorder=0)
             if ax.is_first_col():
                 ax.set_ylabel('$\\Delta\\log_{\\epsilon}({\\rm X})$')
             else:
@@ -1285,7 +1299,8 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
             x = 0.5 + np.array(x_data[node])
             y = np.array(y_data[node])
             yerr = np.array(y_err[node])
-            ax.errorbar(x, y, yerr=yerr, lc='k', ecolor='k', aa=True, fmt=None, mec='k', mfc='w', ms=6, zorder=1)
+            if show_errors:
+                ax.errorbar(x, y, yerr=yerr, lc='k', ecolor='k', aa=True, fmt=None, mec='k', mfc='w', ms=6, zorder=1)
             ax.scatter(x, y, facecolor=cmap(cmap_indices[all_nodes.index(node)]), **scatter_kwds)
             color = cmap(cmap_indices[all_nodes.index(node)])
             mean = np.nanmean(y_data[node])
@@ -1295,8 +1310,18 @@ def benchmark_line_abundances(database, element, ion, benchmark_filename, sort_b
             ax.axhline(mean, c=color, lw=2, zorder=-1, label=node.strip())
 
     if extent is None:
-        y_lim = max([ np.abs(ax.get_ylim()).max() for ax in axes.flatten() ])
-        [ ax.set_ylim(-y_lim, +y_lim) for ax in axes.flatten() ]
+        for row in axes:
+            ymin, ymax = np.inf, -np.inf
+            for ax in row:
+
+                ymin = np.nanmin([ymin, ax.get_ylim()[0]])
+                ymax = np.nanmax([ymax, ax.get_ylim()[1]])
+
+            for ax in row:
+                ax.set_ylim(ymin, ymax)
+
+        #y_lim = max([ np.abs(ax.get_ylim()).max() for ax in axes.flatten() ])
+        #[ ax.set_ylim(-y_lim, +y_lim) for ax in axes.flatten() ]
     else:
         [ ax.set_ylim(extent) for ax in axes.flatten() ]
     fig.tight_layout()

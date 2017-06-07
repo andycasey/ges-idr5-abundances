@@ -241,10 +241,9 @@ if __name__ == "__main__":
         credentials = yaml.load(fp)
 
     connection = pg.connect(**credentials)
-    """
-    create_tables(connection)
+    #create_tables(connection)
     
-
+    """
     filenames = glob("data/*.fits")
     cursor = connection.cursor()
     for filename in filenames:
@@ -291,8 +290,7 @@ if __name__ == "__main__":
         logger.info("Done")
     """
 
-
-    files = glob("data/EPINARBO/*.dat")
+    files = glob("data/LUMBA/*.dat")
     N = len(files)
 
     # Check the max length.

@@ -351,7 +351,7 @@ class DataRelease(object):
         duplicates = [k for k, v in counted_names.items() if v > 1]
         if duplicates and prefixes:
 
-            use_prefixes = map(str, range(max(counted_names.values()))) \
+            use_prefixes = list(map(str, range(max(counted_names.values())))) \
                 if isinstance(prefixes, bool) else prefixes
 
             # Put the prefixes and names in the right order & format for joining

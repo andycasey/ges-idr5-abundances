@@ -11,9 +11,10 @@ import logging
 
 
 FIGURE_DIR = "figures"
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
     format='%(asctime)-15s %(name)s %(levelname)s %(message)s')
 logger = logging.getLogger('ges')
+logger.setLevel(logging.INFO)
 
 
 import matplotlib.pyplot as plt
@@ -62,6 +63,9 @@ def make_figures(figures, database, element, ion, format="png"):
                 fig.savefig(filename)
                 print("Created {}".format(filename))
 
+
+    plt.close("all")
+    del figures
     
     return failed
 
@@ -114,8 +118,46 @@ if __name__ == "__main__":
         """
         
     species = [
-        ("Fe", 1, None),
-        ("Fe", 2, None),
+        ("Al", 1, None),
+        ("Ba", 2, None),
+        ("He", 1, None),
+        ("Li", 1, None),
+        ("C", 1, None),
+        ("C", 2, None),
+        ("C", 3, None),
+        #("C_C2", 0, None),
+        ("N", 2, None),
+        ("N", 3, None),
+        #("N_CN", 0, None),
+        ("O", 1, None),
+        ("O", 2, None),
+        ("Ne", 1, None),
+        ("Ne", 2, None),
+        ("Na", 1, None),
+        ("Mg", 1, None),
+        ("Mg", 2, None),
+        ("Al", 2, None),
+        ("Al", 3, None),
+        ("Si", 1, None),
+        ("Si", 2, None),
+        ("Si", 3, None),
+        ("Si", 4, None),
+        ("S", 1, None),
+        ("S", 2, None),
+        ("S", 3, None),
+        ("Ca", 1, None),
+        ("Ca", 2, None),
+        ("Sc", 1, None),
+        ("Sc", 2, None),
+        ("Ti", 1, None),
+        ("Ti", 2, None),
+        ("V", 1, None),
+        ("V", 2, None),
+        ("Cr", 1, None),
+        ("Cr", 2, None),
+        ("Mn", 1, None),
+
+
         ("Fe", 3, None),
         ("Co", 1, None),
         ("Ni", 1, None),
@@ -129,7 +171,6 @@ if __name__ == "__main__":
         ("Nb", 1, None),
         ("Mo", 1, None),
         ("Ru", 1, None),
-        ("Ba", 2, None),
         ("La", 2, None),
         ("Ce", 2, None),
         ("Pr", 2, None),
@@ -138,7 +179,9 @@ if __name__ == "__main__":
         ("Eu", 2, None),
         ("Gd", 2, None),
         ("Dy", 2, None),
-
+        #("Fe", 1, None),
+        #("Fe", 2, None),
+        
     ]
 
     import yaml
@@ -151,6 +194,8 @@ if __name__ == "__main__":
     #make_figures(figures, database, "Si", 1)
     failures = []
     for element, ion, absolute_extent in species:
+
+
 
         """
         ("compare-bm", (plot.compare_benchmarks, 
@@ -270,11 +315,22 @@ if __name__ == "__main__":
 
         """
         figures = OrderedDict([
-            ("abundance-heatmap", (plot.transition_heatmap, {"column": "abundance"})),
-            ("ew-heatmap", (plot.transition_heatmap, {"column": "ew"})),
+
+
+        ("benchmarks-absolute-errors-unflagged", (plot.benchmark_line_abundances, { 
+            "benchmark_filename": "benchmarks.yaml", "show_errors": True, 
+            "sql_constraint": "l.flags = 0" })),
+
+        ("benchmarks-absolute-errors", (plot.benchmark_line_abundances, { 
+            "benchmark_filename": "benchmarks.yaml", "show_errors": True })),
+        ("benchmarks-absolute", (plot.benchmark_line_abundances, { 
+            "benchmark_filename": "benchmarks.yaml" })),
+
+            #("abundance-heatmap", (plot.transition_heatmap, {"column": "abundance"})),
+            #("ew-heatmap", (plot.transition_heatmap, {"column": "ew"})),
             #("abundance-covariance", (plot.transition_covariance, {"column": "abundance"})),
             #("ew-covariance", (plot.transition_covariance, {"column": "ew"})),
-            ("percentile", plot.percentiles),
+            #("percentile", plot.percentiles),
         ])
         
         try:
